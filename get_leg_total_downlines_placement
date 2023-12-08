@@ -1,0 +1,39 @@
+-- FUNCTION: public.get_leg_total_downlines_placement(integer)
+
+-- DROP FUNCTION IF EXISTS public.get_leg_total_downlines_placement(integer);
+
+CREATE OR REPLACE FUNCTION public.get_leg_total_downlines_placement(
+	in_uid integer)
+    RETURNS integer
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+	
+DECLARE
+	totaldownlines INT;
+BEGIN
+	WITH RECURSIVE hierachy AS (
+		SELECT
+			id,
+			relation_placement_id
+		FROM
+			public."User"
+		WHERE
+			relation_placement_id = in_uid
+		UNION
+			SELECT
+				e.id,
+				e.relation_placement_id
+			FROM
+				public."User" e
+			INNER JOIN hierachy s ON s.id = e.relation_placement_id
+	)
+	SELECT COUNT(*) INTO totaldownlines FROM hierachy;
+	
+	RETURN totaldownlines;
+END;
+$BODY$;
+
+ALTER FUNCTION public.get_leg_total_downlines_placement(integer)
+    OWNER TO postgres;
