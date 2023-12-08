@@ -1,0 +1,54 @@
+-- FUNCTION: public.is_group_downline_of_ref(integer, integer)
+
+-- DROP FUNCTION IF EXISTS public.is_group_downline_of_ref(integer, integer);
+
+CREATE OR REPLACE FUNCTION public.is_group_downline_of_ref(
+	in_uid integer,
+	in_upline_id integer)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+
+DECLARE
+	out_result bool;
+	keep_looking bool:= true;
+	curr_uid int;
+	search_upline_id int;
+BEGIN
+	PERFORM id FROM public."User" WHERE id = in_uid;
+	
+	IF NOT FOUND THEN
+		RAISE EXCEPTION 'USER NOT FOUND';
+	END IF;
+	
+	PERFORM id FROM public."User" WHERE id = in_upline_id;
+	
+	IF NOT FOUND THEN
+		RAISE EXCEPTION 'UPLINE NOT FOUND';
+	END IF;
+	
+	curr_uid = in_uid;
+	
+	WHILE curr_uid IS NOT NULL LOOP
+		SELECT relation_ref_id INTO search_upline_id FROM public."User" WHERE id = curr_uid;
+		
+		IF search_upline_id IS null THEN
+			keep_looking = false;
+			out_result = false;
+			EXIT;
+		ELSEIF search_upline_id <> in_upline_id THEN
+			curr_uid = search_upline_id;
+		ELSEIF search_upline_id = in_upline_id THEN
+			out_result = true;
+			EXIT;
+		END IF;
+		
+	END LOOP;
+	RETURN out_result;
+END
+$BODY$;
+
+ALTER FUNCTION public.is_group_downline_of_ref(integer, integer)
+    OWNER TO postgres;
