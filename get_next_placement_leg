@@ -1,0 +1,82 @@
+-- FUNCTION: public.get_next_placement_leg(integer)
+
+-- DROP FUNCTION IF EXISTS public.get_next_placement_leg(integer);
+
+CREATE OR REPLACE FUNCTION public.get_next_placement_leg(
+	in_uid integer)
+    RETURNS TABLE(out_placement_uid integer, out_placement_positon integer) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+DECLARE
+	head_legs int;
+	cur_head_id int;
+	head_leg_arr int[];
+	new_leg int;
+	leg_found bool := false;
+	current_leg_uid int;
+	place_leg int;
+	f record;
+	h record;
+	current_leg int := 1;
+BEGIN
+	head_legs = 0;
+	
+-- 	PERFORM id FROM public."User" WHERE id = in_uid;
+	
+-- 	IF NOT FOUND THEN
+-- 		RAISE EXCEPTION 'HEAD UID USER NOT FOUND';
+-- 	END IF;
+	
+	head_leg_arr = array_append(head_leg_arr,in_uid);
+	WHILE leg_found = false LOOP
+		FOREACH new_leg IN ARRAY head_leg_arr LOOP
+			head_leg_arr = array_remove(head_leg_arr, new_leg);
+			cur_head_id = new_leg;
+			head_legs = 0;
+			--RAISE INFO 'head uid %', cur_head_id;
+			--RAISE INFO 'a';
+			SELECT COUNT(*) INTO head_legs FROM public."User" WHERE relation_placement_id = cur_head_id;
+			--RAISE INFO 'head legs %', head_legs;
+			IF head_legs = 0 THEN
+				current_leg_uid = cur_head_id;
+				place_leg = 1;
+				leg_found = true;
+				EXIT;
+			ELSEIF head_legs = 1 THEN
+				FOR f IN 
+					SELECT placement_leg FROM public."User" WHERE relation_placement_id = cur_head_id
+				LOOP
+					IF f.placement_leg > 1 THEN
+						--RAISE INFO 'c';
+						current_leg_uid = cur_head_id;
+						place_leg = 1;
+						leg_found = true;
+					ELSE
+						--RAISE INFO 'd';
+						current_leg_uid = cur_head_id;
+						place_leg = 2;
+						leg_found = true;
+					END IF;	
+				END LOOP;
+				EXIT;
+			ELSE
+				FOR h IN 
+					SELECT id FROM public."User" WHERE relation_placement_id = cur_head_id 
+				LOOP
+					head_leg_arr = array_append(head_leg_arr,h.id);
+				END LOOP;
+			END IF;
+		END LOOP;
+	END LOOP;
+	
+	RETURN QUERY SELECT current_leg_uid AS out_placement_uid, place_leg AS out_placement_positon;
+END;
+
+$BODY$;
+
+ALTER FUNCTION public.get_next_placement_leg(integer)
+    OWNER TO postgres;
